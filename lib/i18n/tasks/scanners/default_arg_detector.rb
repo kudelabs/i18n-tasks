@@ -28,6 +28,7 @@ module I18n::Tasks::Scanners
                       else
                         puts "Warning: Not supported file type:"
                         puts " File: #{path}"
+                        puts " Content: #{content}"
                         return
                       end
 
