@@ -56,6 +56,7 @@ module I18n::Tasks::Scanners::Files
     # @param globs [Array<String>]
     # @return [Boolean]
     def path_fnmatch_any?(path, globs)
+      path = File.absolute_path path
       globs.any? { |glob| File.fnmatch(glob, path) }
     end
   end
