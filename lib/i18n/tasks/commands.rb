@@ -10,6 +10,7 @@ require 'i18n/tasks/command/commands/tree'
 require 'i18n/tasks/command/commands/meta'
 require 'i18n/tasks/command/commands/xlsx'
 require 'i18n/tasks/command/commander'
+require 'i18n/tasks/command/commands/merge_default'
 
 module I18n::Tasks
   class Commands < Command::Commander
@@ -22,6 +23,7 @@ module I18n::Tasks
     include Command::Commands::Tree
     include Command::Commands::Meta
     include Command::Commands::XLSX
+    include Command::Commands::MergeDefault
 
     include Term::ANSIColor
     require 'highline/import'

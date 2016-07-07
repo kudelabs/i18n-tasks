@@ -27,15 +27,17 @@ module I18n::Tasks::Scanners
                         content.scan(/I18n.t\([^,]+,\s*{\s*defaultValue: `([^`]+)`/).flatten.first
                       else
                         puts "Warning: Not supported file type:"
-                        puts " File: #{path}"
-                        puts " Content: #{content}"
+                        puts " File:    #{path}"
+                        puts " Content: #{content.lstrip}"
+                        puts ''
                         return
                       end
 
         if default_arg.nil?
           puts "Warning: Unable to recognize default arg:"
-          puts "  File: #{path}"
-          puts "  Content: #{content}"
+          puts "  File:    #{path}"
+          puts "  Content: #{content.lstrip}"
+          puts ''
         end
 
         default_arg
@@ -44,6 +46,7 @@ module I18n::Tasks::Scanners
         puts "  File: #{path}"
         puts "  Content: #{content}"
         puts "  #{e.message}"
+        puts ''
       end
     end
 

@@ -152,6 +152,9 @@ module I18n::Tasks::Data::Tree
         return if our == node
         our.value = node.value if node.leaf?
         our.data.merge!(node.data) if node.data?
+
+        our.children = nil if node.leaf? && our.children
+
         if node.children?
           if our.children
             our.children.merge!(node.children)
