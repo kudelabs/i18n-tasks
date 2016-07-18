@@ -24,7 +24,9 @@ module I18n::Tasks::Scanners
                       when '.erb'
                         find_by_ruby_ast ERB.new(content).src
                       when '.js'
-                        content.scan(/I18n.t\([^,]+,\s*{\s*defaultValue: `([^`]+)`/).flatten.first
+                        matched = content.scan(/I18n.t\([^,]+,\s*{\s*defaultValue: `([^`]+)`/).flatten.first
+                        return if matched.nil? && content !~ /I18n.t/ #not translation in JS
+                        matched
                       else
                         puts "Warning: Not supported file type:"
                         puts " File:    #{path}"
@@ -66,7 +68,19 @@ module I18n::Tasks::Scanners
             end
           end
 
-          pair_node && pair_node.children.last.children[0]
+          if pair_node
+            default = pair_node.children.last
+            if default.type == :hash
+              default.children.inject({}) do |h, pair|
+                key = pair.children[0].children[0]
+                value = pair.children[1].children[0]
+                h[key] = value
+                h
+              end
+            else
+              default.children[0]
+            end
+          end
         end
       end.first
     end
