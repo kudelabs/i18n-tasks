@@ -24,7 +24,7 @@ module I18n::Tasks::Scanners
                       when '.erb'
                         find_by_ruby_ast ERB.new(content).src
                       when '.js'
-                        matched = content.scan(/I18n.t\([^,]+,\s*{\s*defaultValue: `([^`]+)`/).flatten.first
+                        matched = find_by_js_regexp(content)
                         return if matched.nil? && content !~ /I18n.t/ #not translation in JS
                         matched
                       else
@@ -50,6 +50,16 @@ module I18n::Tasks::Scanners
         puts "  #{e.message}"
         puts ''
       end
+    end
+
+    def find_by_js_regexp(content)
+      matched = content.scan(/I18n.t\([^,]+,\s*{\s*defaultValue:\s*(?:`([^`]+)`|"([^"]+)"|'([^']+)')/).flatten.compact.first
+
+      #if matched.nil?
+        #matched = content.scan(/defaultValue:\s*({[^}]+})/).flatten.compact.first
+      #end
+
+      matched
     end
 
     def find_by_ruby_ast(src)
