@@ -18,7 +18,7 @@ module I18n::Tasks
           locales = (opt[:locales] || i18n.locales)
           value   = opt[:'nil-value'] ? nil : opt[:value]
 
-          forest = i18n.missing_diff_forest(locales, i18n.base_locale)
+          forest = i18n.missing_diff_forest(locales, i18n.base_locale).set_each_value!(value)
           i18n.data.merge! forest
           added.merge! forest
 
