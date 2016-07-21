@@ -45,7 +45,8 @@ module I18n::Tasks::Scanners::Results
         results_by_key
       }.map { |key, all_occurrences|
         occurrences = all_occurrences.flatten(1)
-        occurrences.sort_by!(&:path)
+        #occurrences.sort_by!(&:path)
+        occurrences.reverse!
         occurrences.uniq!
         new(key: key, occurrences: occurrences)
       }
