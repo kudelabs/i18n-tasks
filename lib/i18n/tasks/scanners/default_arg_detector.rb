@@ -35,12 +35,12 @@ module I18n::Tasks::Scanners
                         return
                       end
 
-        if default_arg.nil?
-          puts "Warning: Unable to recognize default arg:"
-          puts "  File:    #{path}"
-          puts "  Content: #{content.lstrip}"
-          puts ''
-        end
+        #if default_arg.nil?
+          #puts "Warning: Unable to recognize default arg:"
+          #puts "  File:    #{path}"
+          #puts "  Content: #{content.lstrip}"
+          #puts ''
+        #end
 
         default_arg
       rescue => e
@@ -62,6 +62,13 @@ module I18n::Tasks::Scanners
       matched
     end
 
+    # s(:send,
+    #   s(:const, nil, :I18n), :t,
+    #   s(:str, "msg.sent_time"),
+    #   s(:hash,
+    #     s(:pair,
+    #       s(:sym, :default),
+    #       s(:str, "msg sent %{time}"))))
     def find_by_ruby_ast(src)
       nodes = ::Parser::CurrentRuby.parse(src)
       finder = I18n::Tasks::Scanners::RubyAstCallFinder.new(messages: %i(t translate), receivers: [nil, s(:const, nil, :I18n)])

@@ -24,30 +24,41 @@ module I18n::Tasks
 
           forest = i18n.used_tree(strict: true).select_keys do |key, node|
             current = i18n.t(key, i18n.base_locale)
-            default = (node.data[:occurrences] || []).detect { |o| o.default_arg.presence }.try(:default_arg)
+            occurrences = node.data[:occurrences] || []
+            occurrence = occurrences.find { |o| o.default_arg }
+            default = occurrence ? occurrence.default_arg : nil
 
-            next false if default.nil?
+            if default.is_a?(Hash) && default.all? { |k, _| I18n::Tasks::PluralKeys::PLURAL_KEY_SUFFIXES.include? k.to_s }
+              if current.is_a?(Hash) && default.all? { |k, v| current[k.to_s] == v }
+                false
+              else
+                default.each do |k, v|
+                  old = occurrence
+                  new_occurrence = I18n::Tasks::Scanners::Results::Occurrence.new({
+                    path: old.path, pos: old.pos,
+                    line_num: old.line_num, line_pos: old.line_pos,
+                    line: old.line, raw_key: "#{old.raw_key}.#{k}", default_arg: v
+                  })
 
-            if default.is_a?(Hash)
-              if default.all? { |k, _| I18n::Tasks::PluralKeys::PLURAL_KEY_SUFFIXES.include? k.to_s }
-                unless current.is_a?(Hash) && default.all? { |k, v| current[k.to_s] == v }
-                  puts "Warning: Default value of plural key changed, Please update yml with following content(below '---') manually:"
-                  puts ({ key => default }).to_yaml
-                  puts ""
+                  node.append! I18n::Tasks::Data::Tree::Node.new(key: k.to_s, data: { occurrences: [new_occurrence] })
                 end
-                next false
               end
-            end
-
-            if current && !current.is_a?(String)
-              puts "Warning: Value in #{i18n.base_locale}.yml is not a String:"
+            elsif default.is_a? String
+              current != default
+            elsif default == nil
+              puts "Warning: Default Value not found or not well formed:"
+              puts "  Key: #{key}"
+              puts "  File: #{occurrences.first.path}:#{occurrences.first.line_num}"
+              puts "  Content: #{occurrences.first.line.lstrip}"
+              puts ""
+            else
+              puts "Warning: Default Value is not a String or Plural Hash:"
               puts "  Key: #{key}"
               puts "  Value in YAML: #{current}"
               puts "  Default Value: #{default}"
+              puts "  Default Value Path: #{occurrence.try(:path)}"
               puts ""
             end
-
-            current != default
           end.set_root_key!(i18n.base_locale).set_each_value!(value)
           i18n.data.merge! forest
 
