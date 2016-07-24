@@ -67,7 +67,7 @@ module I18n::Tasks::Scanners
             key = [scope, key].join('.') unless scope == ''.freeze
           end
           default_arg = if (default_arg_node = extract_hash_pair(second_arg_node, 'default'.freeze))
-                          extract_string(default_arg_node.children[1])
+                          extract_string(default_arg_node.children[1]) || extract_hash(default_arg_node.children[1])
                         end
         end
         full_key = if send_node.children[0].nil?
@@ -77,6 +77,17 @@ module I18n::Tasks::Scanners
                      key
                    end
         [full_key, range_to_occurrence(key, location.expression, default_arg: default_arg)]
+      end
+    end
+
+    def extract_hash(node)
+      if node.type == :hash
+        node.children.inject({}) do |h, pair|
+          key = pair.children[0].children[0]
+          value = pair.children[1].children[0]
+          h[key] = value
+          h
+        end
       end
     end
 

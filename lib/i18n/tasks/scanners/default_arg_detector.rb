@@ -3,6 +3,9 @@ require 'parser/current'
 require 'haml' rescue nil
 require 'erb' rescue nil
 
+require 'execjs'
+ExecJS.runtime = ExecJS::Runtimes::Node
+
 module I18n::Tasks::Scanners
   class DefaultArgDetector
     include AST::Sexp
@@ -52,12 +55,30 @@ module I18n::Tasks::Scanners
       end
     end
 
+    # I18n.t("msg.show", { defaultValue: "MSG SHOW" })
+    # I18n.t("msg.count", { defaultValue: { one: "1 MSG", other: "%{count} MSGS" }})
     def find_by_js_regexp(content)
       matched = content.scan(/I18n.t\([^,]+,\s*{\s*defaultValue:\s*(?:`([^`]+)`|"([^"]+)"|'([^']+)')/).flatten.compact.first
 
-      #if matched.nil?
-        #matched = content.scan(/defaultValue:\s*({[^}]+})/).flatten.compact.first
-      #end
+      if matched.nil?
+        matched = content.scan(/I18n.t\([^,]+,\s*{\s*defaultValue:\s*({.+})/).flatten.compact.first
+        if matched
+          openBr = 0
+          text = ''
+          matched.each_char do |char|
+            case char
+            when "{"
+              openBr += 1
+            when "}"
+              openBr -= 1
+            end
+            text << char
+            break if openBr == 0
+          end
+
+          matched = ExecJS.eval text
+        end
+      end
 
       matched
     end
