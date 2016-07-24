@@ -25,6 +25,23 @@ module I18n::Tasks
           forest = i18n.used_tree(strict: true).select_keys do |key, node|
             current = i18n.t(key, i18n.base_locale)
             occurrences = node.data[:occurrences] || []
+
+            duplications = occurrences.select do |occurrence|
+              (i18n.config[:search][:ignore_duplication_warning] || []).none? do |pattern|
+                File.absolute_path(occurrence.path).start_with? File.absolute_path(pattern)
+              end
+            end
+
+            if duplications.map(&:default_arg).uniq.length > 1
+              puts "Warning: Duplicate Default"
+              puts "  Key: #{key}"
+              duplications.each do |occurrence|
+                puts "  File: #{occurrence.path}:#{occurrence.line_num}"
+                puts "    Content: #{occurrence.line.lstrip}"
+              end
+              puts ""
+            end
+
             occurrence = occurrences.find { |o| o.default_arg }
             default = occurrence ? occurrence.default_arg : nil
 
