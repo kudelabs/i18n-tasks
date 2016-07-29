@@ -21,31 +21,16 @@ module I18n::Tasks::Scanners
 
     def detect
       begin
-        default_arg = case file_type
-                      when '.haml'
-                        find_by_ruby_ast ::Haml::Engine.new(content.gsub(/^\s*/, '')).precompiled
-                      when '.erb'
-                        find_by_ruby_ast ERB.new(content).src
-                      when '.js'
-                        matched = find_by_js_regexp(content)
-                        return if matched.nil? && content !~ /I18n.t/ #not translation in JS
-                        matched
-                      else
-                        puts "Warning: Not supported file type:"
-                        puts " File:    #{path}"
-                        puts " Content: #{content.lstrip}"
-                        puts ''
-                        return
-                      end
-
-        #if default_arg.nil?
-          #puts "Warning: Unable to recognize default arg:"
-          #puts "  File:    #{path}"
-          #puts "  Content: #{content.lstrip}"
-          #puts ''
-        #end
-
-        default_arg
+        case file_type
+        when '.haml'
+          find_by_ruby_ast ::Haml::Engine.new(content.gsub(/^\s*/, '')).precompiled
+        when '.erb'
+          find_by_ruby_ast ERB.new(content).src
+        when '.js'
+          matched = find_by_js_regexp(content)
+          return if matched.nil? && content !~ /I18n.t/ #not translation in JS
+          matched
+        end
       rescue => e
         puts "Error: Exception raised:"
         puts "  File: #{path}"
