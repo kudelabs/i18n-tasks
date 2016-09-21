@@ -49,9 +49,9 @@ module I18n::Tasks::Scanners
           # use `any?` because `include?` checks type equality, but the receiver is a Parser::AST::Node != AST::Node.
           @receivers.any? { |r| r == receiver }
         @callback.call(send_node, @method_name)
-      else
-        handler_missing send_node
       end
+      # always inovke handler_missing to get nested translations in children
+      handler_missing send_node
       nil
     end
 
