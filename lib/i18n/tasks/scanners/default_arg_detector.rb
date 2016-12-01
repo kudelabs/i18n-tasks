@@ -26,7 +26,7 @@ module I18n::Tasks::Scanners
           find_by_ruby_ast ::Haml::Engine.new(content.gsub(/^\s*/, '')).precompiled
         when '.erb'
           find_by_ruby_ast ERB.new(content).src
-        when '.js'
+        when '.js', '.jsx'
           matched = find_by_js_regexp(content)
           return if matched.nil? && content !~ /I18n.t/ #not translation in JS
           matched
