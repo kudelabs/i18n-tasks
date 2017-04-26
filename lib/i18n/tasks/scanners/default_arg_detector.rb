@@ -83,7 +83,7 @@ module I18n::Tasks::Scanners
         next if send_node.children[2].children[0].to_s != raw_key
 
         args = send_node.children[3]
-        if args.type == :hash
+        if args && args.type == :hash
           pair_node = args.children.find do |pair|
             if pair.type == :pair
               key_node = pair.children[0]
