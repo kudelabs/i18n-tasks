@@ -66,6 +66,11 @@ module I18n::Tasks::Data::Tree
       raise 'value should be a I18n::Tasks::Data::Tree::Node' unless node.is_a?(Node)
       key_part, rest = split_key(full_key, 2)
       child          = key_to_node[key_part]
+      
+      # Otherwise the order of keys will determine whether or not we get a warning.
+      if child && child.children.any?{|c| c.full_key == full_key}
+        warn_add_leaf_at_branch(full_key)
+      end
 
       if rest
         unless child
@@ -195,6 +200,10 @@ module I18n::Tasks::Data::Tree
 
     def warn_add_children_to_leaf(node)
       ::I18n::Tasks::Logging.log_warn "'#{node.full_key}' was a leaf, now has children (value <- scope conflict)"
+    end
+    
+    def warn_add_leaf_at_branch(full_key)
+      ::I18n::Tasks::Logging.log_warn "'#{full_key}' was a branch, now is being treated as a leaf (value <- scope conflict)"
     end
 
     class << self
