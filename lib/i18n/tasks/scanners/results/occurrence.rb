@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 module I18n::Tasks
   module Scanners
     module Results
@@ -9,13 +10,13 @@ module I18n::Tasks
         # @return [String] source path relative to the current working directory.
         attr_reader :path
 
-        # @return [Fixnum] count of characters in the file before the occurrence.
+        # @return [Integer] count of characters in the file before the occurrence.
         attr_reader :pos
 
-        # @return [Fixnum] line number of the occurrence, counting from 1.
+        # @return [Integer] line number of the occurrence, counting from 1.
         attr_reader :line_num
 
-        # @return [Fixnum] position of the start of the occurrence in the line, counting from 1.
+        # @return [Integer] position of the start of the occurrence in the line, counting from 1.
         attr_reader :line_pos
 
         # @return [String] the line of the occurrence, excluding the last LF or CRLF.
@@ -28,12 +29,13 @@ module I18n::Tasks
         attr_accessor :raw_key
 
         # @param path        [String]
-        # @param pos         [Fixnum]
-        # @param line_num    [Fixnum]
-        # @param line_pos    [Fixnum]
+        # @param pos         [Integer]
+        # @param line_num    [Integer]
+        # @param line_pos    [Integer]
         # @param line        [String]
         # @param raw_key     [String, nil]
         # @param default_arg [String, nil]
+        # rubocop:disable Metrics/ParameterLists
         def initialize(path:, pos:, line_num:, line_pos:, line:, raw_key: nil, default_arg: nil)
           @path        = path
           @pos         = pos
@@ -43,6 +45,7 @@ module I18n::Tasks
           @raw_key     = raw_key
           @default_arg = default_arg
         end
+        # rubocop:enable Metrics/ParameterLists
 
         def inspect
           "Occurrence(#{@path}:#{@line_num}:#{@line_pos}:#{@pos}:#{@raw_key}:#{@default_arg})"
@@ -50,7 +53,7 @@ module I18n::Tasks
 
         def ==(other)
           other.path == @path && other.pos == @pos && other.line_num == @line_num && other.line == @line &&
-              other.raw_key == @raw_key && other.default_arg == @default_arg
+            other.raw_key == @raw_key && other.default_arg == @default_arg
         end
 
         def eql?(other)

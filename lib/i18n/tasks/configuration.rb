@@ -1,11 +1,12 @@
 # frozen_string_literal: true
-module I18n::Tasks::Configuration
+
+module I18n::Tasks::Configuration # rubocop:disable Metrics/ModuleLength
   DEFAULTS = {
-      base_locale:     'en'.freeze,
-      internal_locale: 'en'.freeze,
-      search:          ::I18n::Tasks::UsedKeys::SEARCH_DEFAULTS,
-      data:            ::I18n::Tasks::Data::DATA_DEFAULTS
-  }
+    base_locale: 'en',
+    internal_locale: 'en',
+    search: ::I18n::Tasks::UsedKeys::SEARCH_DEFAULTS,
+    data: ::I18n::Tasks::Data::DATA_DEFAULTS
+  }.freeze
 
   # i18n-tasks config (defaults + config/i18n-tasks.yml)
   # @return [Hash{String => String,Hash,Array}]
@@ -13,18 +14,20 @@ module I18n::Tasks::Configuration
     @config || (self.config = {})
   end
 
-  CONFIG_FILES = %w(
-      config/i18n-tasks.yml config/i18n-tasks.yml.erb
-      i18n-tasks.yml i18n-tasks.yml.erb
-  )
+  CONFIG_FILES = %w[
+    config/i18n-tasks.yml config/i18n-tasks.yml.erb
+    i18n-tasks.yml i18n-tasks.yml.erb
+  ].freeze
 
   def file_config
     file   = CONFIG_FILES.detect { |f| File.exist?(f) }
-    config = file && YAML.load(Erubis::Eruby.new(File.read(file, encoding: 'UTF-8')).result)
+    # rubocop:disable Security/Eval
+    config = file && YAML.load(eval(Erubi::Engine.new(File.read(file, encoding: 'UTF-8')).src))
+    # rubocop:enable Security/Eval
     if config.present?
       config.with_indifferent_access.tap do |c|
         if c[:relative_roots]
-          warn_deprecated 'config/i18n-tasks.yml has relative_roots on top level. Please move relative_roots under search.'
+          warn_deprecated 'Please move relative_roots under search in config/i18n-tasks.yml.'
           c[:search][:relative_roots] = c.delete(:relative_roots)
         end
       end
@@ -34,9 +37,8 @@ module I18n::Tasks::Configuration
   end
 
   def config=(conf)
-    @config          = file_config.deep_merge(conf)
+    @config = file_config.deep_merge(conf)
     @config_sections = {}
-    @config
   end
 
   # data config
@@ -44,8 +46,8 @@ module I18n::Tasks::Configuration
   def data_config
     @config_sections[:data] ||= begin
       {
-          adapter: data.class.name,
-          config:  data.config
+        adapter: data.class.name,
+        config: data.config
       }
     end
   end
@@ -54,8 +56,10 @@ module I18n::Tasks::Configuration
   # @return [Hash{String => String,Hash,Array}]
   def translation_config
     @config_sections[:translation] ||= begin
-      conf           = (config[:translation] || {}).with_indifferent_access
-      conf[:api_key] ||= ENV['GOOGLE_TRANSLATE_API_KEY'] if ENV.key?('GOOGLE_TRANSLATE_API_KEY')
+      conf = (config[:translation] || {}).with_indifferent_access
+      conf[:google_translate_api_key] = ENV['GOOGLE_TRANSLATE_API_KEY'] if ENV.key?('GOOGLE_TRANSLATE_API_KEY')
+      conf[:deepl_api_key] = ENV['DEEPL_AUTH_KEY'] if ENV.key?('DEEPL_AUTH_KEY')
+      conf[:yandex_api_key] = ENV['YANDEX_API_KEY'] if ENV.key?('YANDEX_API_KEY')
       conf
     end
   end
@@ -71,11 +75,21 @@ module I18n::Tasks::Configuration
   end
 
   def internal_locale
-    @config_sections[:internal_locale] ||= (config[:internal_locale] || DEFAULTS[:internal_locale]).to_s
+    @config_sections[:internal_locale] ||= begin
+      internal_locale = (config[:internal_locale] || DEFAULTS[:internal_locale]).to_s
+      valid_locales = Dir[File.join(I18n::Tasks.gem_path, 'config', 'locales', '*.yml')]
+                      .map { |f| File.basename(f, '.yml') }
+      unless valid_locales.include?(internal_locale)
+        log_warn "invalid internal_locale #{internal_locale.inspect}. "\
+                 "Available internal locales: #{valid_locales * ', '}."
+        internal_locale = DEFAULTS[:internal_locale].to_s
+      end
+      internal_locale
+    end
   end
 
   def ignore_config(type = nil)
-    key                   = type ? "ignore_#{type}" : 'ignore'
+    key = type ? "ignore_#{type}" : 'ignore'
     @config_sections[key] ||= config[key]
   end
 
@@ -96,25 +110,25 @@ module I18n::Tasks::Configuration
   end
 
   def config_for_inspect
-    to_hash_from_indifferent(config_sections.reject { |k, v| v.blank? }).tap do |sections|
-      sections.each do |_k, section|
-        section.merge! section.delete('config') if Hash === section && section.key?('config')
+    to_hash_from_indifferent(config_sections.reject { |_k, v| v.blank? }).tap do |sections|
+      sections.each_value do |section|
+        section.merge! section.delete('config') if section.is_a?(Hash) && section.key?('config')
       end
     end
   end
 
   private
 
-  def to_hash_from_indifferent(v)
-    case v
-      when Hash
-        v.stringify_keys.to_hash.tap do |h|
-          h.each { |k, v| h[k] = to_hash_from_indifferent(v) if Hash === v || Array === v }
-        end
-      when Array
-        v.map { |e| to_hash_from_indifferent e }
-      else
-        v
+  def to_hash_from_indifferent(value)
+    case value
+    when Hash
+      value.stringify_keys.to_hash.tap do |h|
+        h.each { |k, v| h[k] = to_hash_from_indifferent(v) if v.is_a?(Hash) || v.is_a?(Array) }
+      end
+    when Array
+      value.map { |e| to_hash_from_indifferent e }
+    else
+      value
     end
   end
 end

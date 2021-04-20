@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 module I18n::Tasks::Reports
   class Base
     include I18n::Tasks::Logging
@@ -8,6 +9,7 @@ module I18n::Tasks::Reports
     end
 
     attr_reader :task
+
     delegate :base_locale, :locales, to: :task
 
     protected
@@ -20,6 +22,10 @@ module I18n::Tasks::Reports
       "Missing translations (#{forest.leaves.count || '∅'})"
     end
 
+    def inconsistent_interpolations_title(forest)
+      "Inconsistent interpolations (#{forest.leaves.count || '∅'})"
+    end
+
     def unused_title(key_values)
       "Unused keys (#{key_values.count || '∅'})"
     end
@@ -30,28 +36,30 @@ module I18n::Tasks::Reports
 
     def used_title(keys_nodes, filter)
       used_n = keys_nodes.map { |_k, node| node.data[:occurrences].size }.reduce(:+).to_i
-      "#{keys_nodes.size} key#{'s' if keys_nodes.size != 1}#{" matching '#{filter}'" if filter}#{" (#{used_n} usage#{'s' if used_n != 1})" if used_n > 0}"
+      "#{keys_nodes.size} key#{'s' if keys_nodes.size != 1}#{" matching '#{filter}'" if filter}"\
+      "#{" (#{used_n} usage#{'s' if used_n != 1})" if used_n.positive?}"
     end
 
     # Sort keys by their attributes in order
     # @param [Hash] order e.g. {locale: :asc, type: :desc, key: :asc}
-    def sort_by_attr!(objects, order = {locale: :asc, key: :asc})
+    def sort_by_attr!(objects, order = { locale: :asc, key: :asc })
       order_keys = order.keys
-      objects.sort! { |a, b|
+      objects.sort! do |a, b|
         by = order_keys.detect { |k| a[k] != b[k] }
         order[by] == :desc ? b[by] <=> a[by] : a[by] <=> b[by]
-      }
+      end
       objects
     end
 
     def forest_to_attr(forest)
-      forest.keys(root: false).map { |key, node|
-        {key: key, value: node.value, type: node.data[:type], locale: node.root.key, data: node.data}
-      }
+      forest.keys(root: false).map do |key, node|
+        { key: key, value: node.value, type: node.data[:type], locale: node.root.key, data: node.data }
+      end
     end
 
     def format_locale(locale)
       return '' unless locale
+
       if locale.split('+') == task.locales.sort
         'all'
       else
@@ -61,8 +69,7 @@ module I18n::Tasks::Reports
 
     def collapse_missing_tree!(forest)
       forest = task.collapse_plural_nodes!(forest)
-      forest = task.collapse_same_key_in_locales!(forest) { |node| node.data[:type] == :missing_used }
-      forest
+      task.collapse_same_key_in_locales!(forest) { |node| node.data[:type] == :missing_used }
     end
   end
 end

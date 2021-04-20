@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 module I18n::Tasks
   module Command
     module DSL
@@ -9,16 +10,15 @@ module I18n::Tasks
         end
       end
 
-      def t(*args)
-        I18n.t(*args)
+      def t(*args, **kwargs)
+        I18n.t(*args, **kwargs)
       end
 
       module ClassMethods
         def cmd(name, conf = nil)
           if conf
             conf        = conf.dup
-            conf[:args] = (args = conf[:args]) ? args.map { |arg| Symbol === arg ? arg(arg) : arg } : []
-
+            conf[:args] = (conf[:args] || []).map { |arg| arg.is_a?(Symbol) ? arg(arg) : arg }
             dsl(:cmds)[name] = conf
           else
             dsl(:cmds)[name]
@@ -42,8 +42,8 @@ module I18n::Tasks
         end
 
         # late-bound I18n.t for module bodies
-        def t(*args)
-          proc { I18n.t(*args) }
+        def t(*args, **kwargs)
+          proc { I18n.t(*args, **kwargs) }
         end
 
         # if class is a module, merge DSL definitions when it is included

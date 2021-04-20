@@ -20,7 +20,7 @@ module I18n::Tasks::Data::Tree
     end
 
     def attributes
-      {nodes: @list}
+      { nodes: @list }
     end
 
     def derive(new_attr = {})
@@ -33,7 +33,7 @@ module I18n::Tasks::Data::Tree
     def to_hash(sort = false)
       (@hash ||= {})[sort] ||= begin
         if sort
-          self.sort { |a, b| a.key <=> b.key }
+          sort_by(&:key)
         else
           self
         end.map { |node| node.to_hash(sort) }.reduce({}, :deep_merge!)
@@ -47,14 +47,14 @@ module I18n::Tasks::Data::Tree
       if present?
         map(&:inspect) * "\n"
       else
-        Term::ANSIColor.dark '{∅}'
+        Rainbow('{∅}').faint
       end
     end
 
     # methods below change state
 
     def remove!(node)
-      @list.delete(node) or raise "#{node.full_key} not found in #{self.inspect}"
+      @list.delete(node) || fail("#{node.full_key} not found in #{inspect}")
       dirty!
       self
     end
@@ -80,6 +80,7 @@ module I18n::Tasks::Data::Tree
 
     def children(&block)
       return to_enum(:children) { map { |c| c.children ? c.children.size : 0 }.reduce(:+) } unless block
+
       each do |node|
         node.children.each(&block) if node.children?
       end
@@ -88,6 +89,7 @@ module I18n::Tasks::Data::Tree
     alias children? any?
 
     protected
+
     def dirty!
       @hash = nil
     end

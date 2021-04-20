@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 module Trees
   def expect_node_key_data(node, key, data)
     expect(node.full_key(root: false)).to eq key
@@ -10,12 +11,13 @@ module Trees
   end
 
   def build_node(attr = {})
-    raise 'invalid node (more than 1 root)' if attr.size > 1
+    fail 'invalid node (more than 1 root)' if attr.size > 1
+
     key, value = attr.first
     I18n::Tasks::Data::Tree::Node.from_key_value(key, value)
   end
 
-  def new_node(attr = {})
-    I18n::Tasks::Data::Tree::Node.new(attr)
+  def new_node(**attr)
+    I18n::Tasks::Data::Tree::Node.new(**attr)
   end
 end

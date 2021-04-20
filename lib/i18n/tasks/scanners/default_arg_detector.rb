@@ -1,7 +1,6 @@
 require 'i18n/tasks/scanners/ruby_ast_call_finder'
 require 'parser/current'
-require 'haml' rescue nil
-require 'erb' rescue nil
+require 'erb'
 
 require 'execjs'
 ExecJS.runtime = ExecJS::Runtimes::Node
@@ -23,6 +22,11 @@ module I18n::Tasks::Scanners
       begin
         case file_type
         when '.haml'
+          begin
+            require 'haml'
+          rescue LoadError
+            raise LoadError, %{Unable to detect default value of translations in haml file. Please add `gem "haml"` to your Gemfile.}
+          end
           find_by_ruby_ast ::Haml::Engine.new(content.gsub(/^\s*/, '')).precompiled
         when '.erb'
           find_by_ruby_ast ERB.new(content).src
@@ -32,10 +36,10 @@ module I18n::Tasks::Scanners
           matched
         end
       rescue => e
-        puts "Error: Exception raised:"
-        puts "  File: #{path}"
-        puts "  Content: #{content}"
-        puts "  #{e.message}"
+        puts "Error occurred on detecting default value of translations: #{e.message}"
+        puts "File: #{path}"
+        puts "Content: #{content}"
+        puts e.backtrace.join("\n")
         puts ''
       end
     end
@@ -77,7 +81,7 @@ module I18n::Tasks::Scanners
     #       s(:str, "msg sent %{time}"))))
     def find_by_ruby_ast(src)
       nodes = ::Parser::CurrentRuby.parse(src)
-      finder = I18n::Tasks::Scanners::RubyAstCallFinder.new(messages: %i(t translate), receivers: [nil, s(:const, nil, :I18n)])
+      finder = I18n::Tasks::Scanners::RubyAstCallFinder.new(receiver_messages: I18n::Tasks::Scanners::RubyAstScanner::RECEIVER_MESSAGES)
 
       finder.collect_calls(nodes) do |send_node, _method_name|
         next if send_node.children[2].children[0].to_s != raw_key

@@ -1,10 +1,10 @@
 # frozen_string_literal: true
+
 module I18n::Tasks::Scanners::Files
   # Reads the files in 'rb' mode and UTF-8 encoding.
   #
   # @since 0.9.0
   class FileReader
-
     # Return the contents of the file at the given path.
     # The file is read in the 'rb' mode and UTF-8 encoding.
     #

@@ -1,6 +1,4 @@
-# i18n-tasks [![Build Status][badge-travis]][travis] [![Coverage Status][badge-coverage]][coverage] [![Code Climate][badge-code-climate]][code-climate] [![Gemnasium][badge-gemnasium]][gemnasium] [![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/glebm/i18n-tasks?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-
-<a href='https://pledgie.com/campaigns/28570'><img alt='Click here to lend your support to: i18n-tasks for Ruby and make a donation at pledgie.com !' src='https://pledgie.com/campaigns/28570.png?skin_name=chrome' border='0' ></a>
+# i18n-tasks [![Build Status][badge-travis]][travis] [![Coverage Status][badge-coverage]][coverage] [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/glebm/i18n-tasks?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 i18n-tasks helps you find and manage missing and unused translations.
 
@@ -9,7 +7,7 @@ i18n-tasks helps you find and manage missing and unused translations.
 This gem analyses code statically for key usages, such as `I18n.t('some.key')`, in order to:
 
 * Report keys that are missing or unused.
-* Pre-fill missing keys, optionally from Google Translate.
+* Pre-fill missing keys, optionally from Google Translate or DeepL Pro.
 * Remove unused keys.
 
 Thus addressing the two main problems of [i18n gem][i18n-gem] design:
@@ -24,7 +22,7 @@ i18n-tasks can be used with any project using the ruby [i18n gem][i18n-gem] (def
 Add i18n-tasks to the Gemfile:
 
 ```ruby
-gem 'i18n-tasks', '~> 0.9.5'
+gem 'i18n-tasks', '~> 0.9.34'
 ```
 
 Copy the default [configuration file](#configuration):
@@ -39,13 +37,21 @@ Copy rspec test to test for missing and unused translations as part of the suite
 $ cp $(i18n-tasks gem-path)/templates/rspec/i18n_spec.rb spec/
 ```
 
+Or for minitest:
+
+```console
+$ cp $(i18n-tasks gem-path)/templates/minitest/i18n_test.rb test/
+```
+
 ## Usage
 
-Run `i18n-tasks` to get the list of all the tasks with short descriptions.
+Run `bundle exec i18n-tasks` to get the list of all the tasks with short descriptions.
 
 ### Check health
 
-`i18n-tasks health` checks if any keys are missing or not used:
+`i18n-tasks health` checks if any keys are missing or not used,
+that interpolations variables are consistent across locales,
+and that all the locale files are normalized (auto-formatted):
 
 ```console
 $ i18n-tasks health
@@ -78,12 +84,35 @@ Usage: i18n-tasks add-missing [options] [locale ...]
 
 ### Google Translate missing keys
 
-Translate missing values with Google Translate ([more below on the API key](#translation-config)).
+Translate missing values with Google Translate ([more below on the API key](#google-translation-config)).
 
 ```console
 $ i18n-tasks translate-missing
+
 # accepts from and locales options:
-$ i18n-tasks translate-missing --from base es fr
+$ i18n-tasks translate-missing --from=base es fr
+```
+
+### DeepL Pro Translate missing keys
+
+Translate missing values with DeepL Pro Translate ([more below on the API key](#deepl-translation-config)).
+
+```console
+$ i18n-tasks translate-missing --backend=deepl
+
+# accepts from and locales options:
+$ i18n-tasks translate-missing --backend=deepl --from=en fr nl
+```
+
+### Yandex Translate missing keys
+
+Translate missing values with Yandex Translate ([more below on the API key](#yandex-translation-config)).
+
+```console
+$ i18n-tasks translate-missing --backend=yandex
+
+# accepts from and locales options:
+$ i18n-tasks translate-missing --from=en es fr
 ```
 
 ### Find usages
@@ -108,6 +137,9 @@ $ i18n-tasks remove-unused
 These tasks can infer [dynamic keys](#dynamic-keys) such as `t("category.\#{category.name}")` if you set
 `search.strict` to false, or pass `--no-strict` on the command line.
 
+If you want to keep the ordering from the original language file when using remove-unused, pass
+`-k` or `--keep-order`.
+
 ### Normalize data
 
 Sort the keys:
@@ -120,6 +152,50 @@ Sort the keys, and move them to the respective files as defined by [`config.writ
 
 ```console
 $ i18n-tasks normalize -p
+```
+
+### Move / rename / merge keys
+
+`i18n-tasks mv <pattern> <target>` is a versatile task to move or delete keys matching the given pattern.
+
+All nodes (leafs or subtrees) matching [`<pattern>`](#key-pattern-syntax) are merged together and moved to `<target>`.
+
+Rename a node (leaf or subtree):
+
+``` console
+$ i18n-tasks mv user account
+```
+
+Move a node:
+
+``` console
+$ i18n-tasks mv user_alerts user.alerts
+```
+
+Move the children one level up:
+
+``` console
+$ i18n-tasks mv 'alerts.{:}' '\1'
+```
+
+Merge-move multiple nodes:
+
+``` console
+$ i18n-tasks mv '{user,profile}' account
+```
+
+Merge (non-leaf) nodes into parent:
+
+``` console
+$ i18n-tasks mv '{pages}.{a,b}' '\1'
+```
+
+### Delete keys
+
+Delete the keys by using the `rm` task:
+
+```console
+$ i18n-tasks rm 'user.{old_profile,old_title}' another_key
 ```
 
 ### Compose tasks
@@ -138,7 +214,7 @@ $ i18n-tasks unused -f yaml | i18n-tasks data-remove
 
 Remove all keys in `fr` but not `en` from `fr`:
 ```console
-$ i18n-tasks missing -t diff -f yaml en | i18n-tasks tree-rename-key en fr | i18n-tasks data-remove
+$ i18n-tasks missing -t diff -f yaml en | i18n-tasks tree-mv en fr | i18n-tasks data-remove
 ```
 
 See the full list of tasks with `i18n-tasks --help`.
@@ -179,6 +255,11 @@ Alternatively, you can enable dynamic key inference by setting `search.strict` t
 all the dynamic parts of the key will be considered used, e.g. `cats.tenderlove.name` would not be reported as unused.
 Note that only one section of the key is treated as a wildcard for each string interpolation; i.e. in this example,
 `cats.tenderlove.special.name` *will* be reported as unused.
+
+#### I18n.localize
+
+`I18n.localize` is not supported, use [i18n-tasks-use hints](#fine-tuning).
+This is because the key generated by `I18n.localize` depends on the type of the object passed in and thus cannot be inferred statically.
 
 ## Configuration
 
@@ -241,7 +322,7 @@ data:
     - 'config/locales/%{locale}.yml'
 ```
 
-If you want to have i18n-tasks reorganize your existing keys using `data.write`, either set the router to 
+If you want to have i18n-tasks reorganize your existing keys using `data.write`, either set the router to
 `pattern_router` as above, or run `i18n-tasks normalize -p` (forcing the use of the pattern router for that run).
 
 ##### Key pattern syntax
@@ -254,6 +335,16 @@ A special syntax similar to file glob patterns is used throughout i18n-tasks to 
 |      `:`     | matches a single key                                      |
 |   `{a, b.c}` | match any in set, can use `:` and `*`, match is captured  |
 
+Example of usage:
+
+```sh
+$ bundle exec i18n-tasks mv "{:}.contents.{*}_body" "\1.attributes.\2.body"
+
+car.contents.name_body ⮕ car.attributes.name.body
+car.contents.description_body ⮕ car.attributes.description.body
+truck.contents.name_body ⮕ truck.attributes.name.body
+truck.contents.description_body ⮕ truck.attributes.description.body
+```
 
 #### Custom adapters
 
@@ -286,7 +377,7 @@ For more complex cases, you can implement a [custom scanner][custom-scanner-docs
 
 See the [config file][config] to find out more.
 
-<a name="translation-config"></a>
+<a name="google-translation-config"></a>
 ### Google Translate
 
 `i18n-tasks translate-missing` requires a Google Translate API key, get it at [Google API Console](https://code.google.com/apis/console).
@@ -294,7 +385,7 @@ See the [config file][config] to find out more.
 Where this key is depends on your Google API console:
 
 * Old console: API Access -> Simple API Access -> Key for server apps.
-* New console: Project -> APIS & AUTH -> Credentials -> Public API access -> Key for server applications.
+* New console: Nav Menu -> APIs & Services -> Credentials -> Create Credentials -> API Keys -> Restrict Key -> Cloud Translation API
 
 In both cases, you may need to create the key if it doesn't exist.
 
@@ -303,20 +394,38 @@ Put the key in `GOOGLE_TRANSLATE_API_KEY` environment variable or in the config 
 ```yaml
 # config/i18n-tasks.yml
 translation:
-  api_key: <Google Translate API key>
+  google_translate_api_key: <Google Translate API key>
+```
+
+<a name="deepl-translation-config"></a>
+### DeepL Pro Translate
+
+`i18n-tasks translate-missing` requires a DeepL Pro API key, get it at [DeepL](https://www.deepl.com/pro).
+
+```yaml
+# config/i18n-tasks.yml
+translation:
+  deepl_api_key: <Deep Pro API key>
+```
+
+<a name="yandex-translation-config"></a>
+### Yandex Translate
+
+`i18n-tasks translate-missing` requires a Yandex API key, get it at [Yandex](https://tech.yandex.com/translate).
+
+```yaml
+# config/i18n-tasks.yml
+translation:
+  yandex_api_key: <Yandex API key>
 ```
 
 ## Interactive console
 
 `i18n-tasks irb` starts an IRB session in i18n-tasks context. Type `guide` for more information.
 
-### XLSX
+## Import / export to a CSV spreadsheet
 
-Export missing and unused data to XLSX:
-
-```console
-$ i18n-tasks xlsx-report
-```
+See [i18n-tasks wiki: CSV import and export tasks](https://github.com/glebm/i18n-tasks/wiki/Custom-CSV-import-and-export-tasks).
 
 ## Add new tasks
 
@@ -325,13 +434,9 @@ Custom tasks can be added easily, see the examples [on the wiki](https://github.
 
 [MIT license]: /LICENSE.txt
 [travis]: https://travis-ci.org/glebm/i18n-tasks
-[badge-travis]: http://img.shields.io/travis/glebm/i18n-tasks.svg
+[badge-travis]: https://img.shields.io/travis/glebm/i18n-tasks.svg
 [coverage]: https://codeclimate.com/github/glebm/i18n-tasks
-[badge-coverage]: https://img.shields.io/codeclimate/coverage/github/glebm/i18n-tasks.svg
-[gemnasium]: https://gemnasium.com/glebm/i18n-tasks
-[badge-gemnasium]: https://gemnasium.com/glebm/i18n-tasks.svg
-[code-climate]: https://codeclimate.com/github/glebm/i18n-tasks
-[badge-code-climate]: http://img.shields.io/codeclimate/github/glebm/i18n-tasks.svg
+[badge-coverage]: https://api.codeclimate.com/v1/badges/5d173e90ada8df07cedc/test_coverage
 [config]: https://github.com/glebm/i18n-tasks/blob/master/templates/config/i18n-tasks.yml
 [wiki]: https://github.com/glebm/i18n-tasks/wiki "i18n-tasks wiki"
 [i18n-gem]: https://github.com/svenfuchs/i18n "svenfuchs/i18n on Github"

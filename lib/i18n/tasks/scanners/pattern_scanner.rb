@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'i18n/tasks/scanners/file_scanner'
 require 'i18n/tasks/scanners/relative_keys'
 require 'i18n/tasks/scanners/occurrence_from_position'
@@ -11,10 +12,24 @@ module I18n::Tasks::Scanners
     include OccurrenceFromPosition
     include RubyKeyLiterals
 
+    TRANSLATE_CALL_RE = /(?<=^|[^\w'\-.]|[^\w'\-]I18n\.|I18n\.)t(?:!|ranslate!?)?/.freeze
+    IGNORE_LINES = {
+      'coffee' => /^\s*#(?!\si18n-tasks-use)/,
+      'erb' => /^\s*<%\s*#(?!\si18n-tasks-use)/,
+      'es6' => %r{^\s*//(?!\si18n-tasks-use)},
+      'haml' => /^\s*-\s*#(?!\si18n-tasks-use)/,
+      'js' => %r{^\s*//(?!\si18n-tasks-use)},
+      'opal' => /^\s*#(?!\si18n-tasks-use)/,
+      'slim' => %r{^\s*(?:-#|/)(?!\si18n-tasks-use)}
+    }.freeze
+
     def initialize(**args)
       super
-      @pattern          = config[:pattern].present? ? Regexp.new(config[:pattern]) : default_pattern
-      @ignore_lines_res = (config[:ignore_lines] || []).inject({}) { |h, (ext, re)| h.update(ext => Regexp.new(re)) }
+      @translate_call_re = config[:translate_call].present? ? Regexp.new(config[:translate_call]) : TRANSLATE_CALL_RE
+      @pattern = config[:pattern].present? ? Regexp.new(config[:pattern]) : default_pattern
+      @ignore_lines_res = (config[:ignore_lines] || IGNORE_LINES).each_with_object({}) do |(ext, re), h|
+        h[ext.to_s] = Regexp.new(re)
+      end
     end
 
     protected
@@ -25,17 +40,20 @@ module I18n::Tasks::Scanners
       keys = []
       text = read_file(path)
       text.scan(@pattern) do |match|
-        src_pos  = Regexp.last_match.offset(0).first
+        src_pos = Regexp.last_match.offset(0).first
         location = occurrence_from_position(path, text, src_pos, raw_key: strip_literal(match[0]))
         next if exclude_line?(location.line, path)
+
         key = match_to_key(match, path, location)
         next unless key
-        key = key + ':'.freeze if key.end_with?('.'.freeze)
+
+        key += ':' if key.end_with?('.')
         next unless valid_key?(key)
+
         keys << [key, location]
       end
       keys
-    rescue Exception => e
+    rescue Exception => e # rubocop:disable Lint/RescueException
       raise ::I18n::Tasks::CommandError.new(e, "Error scanning #{path}: #{e.message}")
     end
 
@@ -52,7 +70,7 @@ module I18n::Tasks::Scanners
       re && re =~ line
     end
 
-    VALID_KEY_RE_DYNAMIC = /^(#{VALID_KEY_CHARS}|[:\#{@}\[\]])+$/
+    VALID_KEY_RE_DYNAMIC = /^(#{VALID_KEY_CHARS}|[:\#{@}\[\]])+$/.freeze
 
     def valid_key?(key)
       if @config[:strict]
@@ -67,21 +85,24 @@ module I18n::Tasks::Scanners
     end
 
     def closest_method(occurrence)
-      method = File.readlines(occurrence.path, encoding: 'UTF-8'.freeze).
-          first(occurrence.line_num - 1).reverse_each.find { |x| x =~ /\bdef\b/ }
-      method && method.strip.sub(/^def\s*/, '').sub(/[\(\s;].*$/, '')
+      method = File.readlines(occurrence.path, encoding: 'UTF-8')
+                   .first(occurrence.line_num - 1).reverse_each.find { |x| x =~ /\bdef\b/ }
+      method && method.strip.sub(/^def\s*/, '').sub(/[(\s;].*$/, '')
     end
 
-    def translate_call_re
-      /(?<=^|[^\w'\-.]|[^\w'\-]I18n\.|I18n\.)t(?:ranslate)?/
-    end
+    # This method only exists for backwards compatibility with monkey-patches and plugins
+    attr_reader :translate_call_re
 
     def default_pattern
       # capture only the first argument
       /
-      #{translate_call_re} [\( ] \s* (?# fn call begin )
-      (#{literal_re})                (?# capture the first argument)
+      #{translate_call_re} [( ] \s* (?# fn call begin )
+      (#{first_argument_re})         (?# capture the first argument)
       /x
+    end
+
+    def first_argument_re
+      literal_re
     end
   end
 end

@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'i18n/tasks'
 require 'i18n/tasks/commands'
 require 'optparse'
@@ -10,38 +11,33 @@ class I18n::Tasks::CLI
     new.start(argv)
   end
 
-  def initialize
-  end
+  def initialize; end
 
   def start(argv)
-    I18n.with_locale(base_task.internal_locale) do
-      auto_output_coloring do
-        begin
-          if run(argv) == :exit_1
-            exit 1
-          end
-        rescue OptionParser::ParseError => e
-          error e.message, 64
-        rescue I18n::Tasks::CommandError => e
-          begin
-            error e.message, 78
-          ensure
-            log_verbose e.backtrace * "\n"
-          end
-        rescue Errno::EPIPE
-          # ignore Errno::EPIPE which is throw when pipe breaks, e.g.:
-          # i18n-tasks missing | head
-          exit 1
-        end
+    auto_output_coloring do
+      exit 1 if run(argv) == :exit1
+    rescue OptionParser::ParseError => e
+      error e.message, 64
+    rescue I18n::Tasks::CommandError => e
+      begin
+        error e.message, 78
+      ensure
+        log_verbose e.backtrace * "\n"
       end
+    rescue Errno::EPIPE
+      # ignore Errno::EPIPE which is throw when pipe breaks, e.g.:
+      # i18n-tasks missing | head
+      exit 1
     end
   rescue ExecutionError => e
     exit e.exit_code
   end
 
   def run(argv)
-    name, *options = parse!(argv.dup)
-    context.run(name, *options)
+    I18n.with_locale(base_task.internal_locale) do
+      name, *options = parse!(argv.dup)
+      context.run(name, *options)
+    end
   end
 
   def context
@@ -51,7 +47,7 @@ class I18n::Tasks::CLI
   def commands
     # load base task to initialize plugins
     base_task
-    @commands ||= ::I18n::Tasks::Commands.cmds.transform_keys { |k| k.to_s.tr('_'.freeze, '-'.freeze) }
+    @commands ||= ::I18n::Tasks::Commands.cmds.transform_keys { |k| k.to_s.tr('_', '-') }
   end
 
   private
@@ -64,7 +60,7 @@ class I18n::Tasks::CLI
     command = parse_command! argv
     options = optparse! command, argv
     parse_options! options, command, argv
-    [command.tr('-'.freeze, '_'.freeze), options.update(arguments: argv)]
+    [command.tr('-', '_'), options.update(arguments: argv)]
   end
 
   def optparse!(command, argv)
@@ -103,14 +99,12 @@ class I18n::Tasks::CLI
 
   def allow_help_arg_first!(argv)
     # allow `i18n-tasks --help command` in addition to `i18n-tasks command --help`
-    if %w(-h --help).include?(argv[0]) && argv[1] && !argv[1].start_with?('-'.freeze)
-      argv[0], argv[1] = argv[1], argv[0]
-    end
+    argv[0], argv[1] = argv[1], argv[0] if %w[-h --help].include?(argv[0]) && argv[1] && !argv[1].start_with?('-')
   end
 
   def parse_command!(argv)
     allow_help_arg_first! argv
-    if argv[0] && !argv[0].start_with?('-'.freeze)
+    if argv[0] && !argv[0].start_with?('-')
       if commands.keys.include?(argv[0])
         argv.shift
       else
@@ -120,9 +114,9 @@ class I18n::Tasks::CLI
   end
 
   def verbose_option(op)
-    op.on('--verbose', 'Verbose output') {
+    op.on('--verbose', 'Verbose output') do
       ::I18n::Tasks.verbose = true
-    }
+    end
   end
 
   def help_option(op)
@@ -157,14 +151,14 @@ class I18n::Tasks::CLI
   def parse_options!(options, command, argv)
     commands[command][:args].each do |flag|
       name          = option_name flag
-      options[name] = parse_option flag, options[name], argv, self.context
+      options[name] = parse_option flag, options[name], argv, context
     end
   end
 
   def parse_option(flag, val, argv, context)
     conf = flag.last.is_a?(Hash) ? flag.last : {}
     if conf[:consume_positional]
-      val = Array(val) + Array(flag.include?(Array) ? argv.flat_map { |x| x.split(','.freeze) } : argv)
+      val = Array(val) + Array(flag.include?(Array) ? argv.flat_map { |x| x.split(',') } : argv)
     end
     val = conf[:default] if val.nil? && conf.key?(:default)
     val = conf[:parser].call(val, context) if conf.key?(:parser)
@@ -172,9 +166,9 @@ class I18n::Tasks::CLI
   end
 
   def option_name(flag)
-    flag.detect { |f|
-      f.start_with?('--'.freeze)
-    }.sub(/\A--(\[no-\])?/, ''.freeze).sub(/[^\-\w].*\z/, ''.freeze).to_sym
+    flag.detect do |f|
+      f.start_with?('--')
+    end.sub(/\A--(\[no-\])?/, '').sub(/[^\-\w].*\z/, '').to_sym
   end
 
   def try_call(v)
@@ -190,7 +184,7 @@ class I18n::Tasks::CLI
     fail ExecutionError.new(message, exit_code)
   end
 
-  class ExecutionError < Exception
+  class ExecutionError < RuntimeError
     attr_reader :exit_code
 
     def initialize(message, exit_code)
@@ -199,12 +193,11 @@ class I18n::Tasks::CLI
     end
   end
 
-  def auto_output_coloring(coloring = ENV['I18N_TASKS_COLOR'] || STDOUT.isatty)
-    coloring_was             = Term::ANSIColor.coloring?
-    Term::ANSIColor.coloring = coloring
+  def auto_output_coloring(coloring = ENV['I18N_TASKS_COLOR'] || $stdout.isatty)
+    coloring_was    = Rainbow.enabled
+    Rainbow.enabled = coloring
     yield
   ensure
-    Term::ANSIColor.coloring = coloring_was
+    Rainbow.enabled = coloring_was
   end
-
 end

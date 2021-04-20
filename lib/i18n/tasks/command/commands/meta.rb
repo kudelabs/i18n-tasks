@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 module I18n::Tasks
   module Command
     module Commands
@@ -6,15 +7,15 @@ module I18n::Tasks
         include Command::Collection
 
         cmd :config,
-            pos:  '[section ...]',
+            pos: '[section ...]',
             desc: t('i18n_tasks.cmd.desc.config')
 
         def config(opts = {})
           cfg = i18n.config_for_inspect
           cfg = cfg.slice(*opts[:arguments]) if opts[:arguments].present?
           cfg = cfg.to_yaml
-          cfg.sub! /\A---\n/, ''
-          cfg.gsub! /^([^\s-].+?:)/, Term::ANSIColor.cyan(Term::ANSIColor.bold('\1'))
+          cfg.sub!(/\A---\n/, '')
+          cfg.gsub!(/^([^\s-].+?:)/, Rainbow('\1').cyan.bright)
           puts cfg
         end
 

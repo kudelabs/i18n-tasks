@@ -1,12 +1,13 @@
 # frozen_string_literal: true
+
 module I18n::Tasks
   module Command
     module OptionParsers
       module Enum
         class Parser
-          DEFAULT_ERROR = proc { |invalid, valid|
+          DEFAULT_ERROR = proc do |invalid, valid|
             I18n.t('i18n_tasks.cmd.enum_opt.invalid', invalid: invalid, valid: valid * ', ')
-          }
+          end
 
           def initialize(valid, error_message = DEFAULT_ERROR)
             @valid         = valid.map(&:to_s)
@@ -15,18 +16,19 @@ module I18n::Tasks
 
           def call(value, *)
             return @valid.first unless value.present?
+
             if @valid.include?(value)
               value
             else
-              raise CommandError.new @error_message.call(value, @valid)
+              fail CommandError, @error_message.call(value, @valid)
             end
           end
         end
 
         class ListParser
-          DEFAULT_ERROR = proc { |invalid, valid|
+          DEFAULT_ERROR = proc do |invalid, valid|
             I18n.t('i18n_tasks.cmd.enum_list_opt.invalid', invalid: invalid * ', ', valid: valid * ', ')
-          }
+          end
 
           def initialize(valid, error_message = DEFAULT_ERROR)
             @valid         = valid.map(&:to_s)
@@ -35,7 +37,8 @@ module I18n::Tasks
 
           def call(values, *)
             values = Array(values)
-            return @valid if values == %w(all)
+            return @valid if values == %w[all]
+
             invalid = values - @valid
             if invalid.empty?
               if values.empty?
@@ -44,7 +47,7 @@ module I18n::Tasks
                 values
               end
             else
-              raise CommandError.new @error_message.call(invalid, @valid)
+              fail CommandError, @error_message.call(invalid, @valid)
             end
           end
         end

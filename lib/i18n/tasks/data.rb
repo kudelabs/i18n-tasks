@@ -1,18 +1,20 @@
 # frozen_string_literal: true
+
 require 'i18n/tasks/data/file_system'
 
 module I18n::Tasks
   module Data
     DATA_DEFAULTS = {
-        adapter: 'I18n::Tasks::Data::FileSystem'
-    }
+      adapter: 'I18n::Tasks::Data::FileSystem'
+    }.freeze
 
     # I18n data provider
     # @see I18n::Tasks::Data::FileSystem
     def data
       @data ||= begin
         data_config = (config[:data] || {}).deep_symbolize_keys
-        data_config.merge!(base_locale: base_locale, locales: config[:locales])
+        data_config[:base_locale] = base_locale
+        data_config[:locales] = config[:locales]
         adapter_class = data_config[:adapter].presence || data_config[:class].presence || DATA_DEFAULTS[:adapter]
         adapter_class = adapter_class.to_s
         adapter_class = 'I18n::Tasks::Data::FileSystem' if adapter_class == 'file_system'
@@ -57,16 +59,29 @@ module I18n::Tasks
       !t(key, locale).nil?
     end
 
-    # write to store, normalizing all data
-    def normalize_store!(from = nil, pattern_router = false)
-      from   = self.locales unless from
-      router = pattern_router ? ::I18n::Tasks::Data::Router::PatternRouter.new(data, data.config) : data.router
+    def external_key?(key, locale = base_locale)
+      data.external(locale)[locale.to_s][key]
+    end
+
+    # Normalize all the locale data in the store (by writing to the store).
+    #
+    # @param [Array<String>] locales locales to normalize. Default: all.
+    # @param [Boolean] force_pattern_router Whether to use pattern router regardless of the config.
+    def normalize_store!(locales: nil, force_pattern_router: false)
+      locales ||= self.locales
+      router = force_pattern_router ? ::I18n::Tasks::Data::Router::PatternRouter.new(data, data.config) : data.router
       data.with_router(router) do
-        Array(from).each do |target_locale|
-          # store handles normalization
+        Array(locales).each do |target_locale|
+          # The store handles actual normalization:
           data[target_locale] = data[target_locale]
         end
       end
+    end
+
+    # @param [Array<String>] locales locales to check. Default: all.
+    # @return [Array<String>] paths to data that requires normalization
+    def non_normalized_paths(locales: nil)
+      Array(locales || self.locales).flat_map { |locale| data.non_normalized_paths(locale) }
     end
   end
 end

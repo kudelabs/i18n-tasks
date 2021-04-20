@@ -1,8 +1,10 @@
 # frozen_string_literal: true
+
 require 'strscan'
 
 module I18n::Tasks::KeyPatternMatching
-  extend self
+  extend self # rubocop:disable Style/ModuleFunction
+
   MATCH_NOTHING = /\z\A/.freeze
 
   # one regex to match any
@@ -11,7 +13,7 @@ module I18n::Tasks::KeyPatternMatching
       # match nothing
       MATCH_NOTHING
     else
-      /(?:#{ key_patterns.map { |p| compile_key_pattern p } * '|'.freeze })/m
+      /(?:#{key_patterns.map { |p| compile_key_pattern p } * '|'})/m
     end
   end
 
@@ -22,14 +24,15 @@ module I18n::Tasks::KeyPatternMatching
   #   { a, b.c } match any in set, can use : and *, match is captured
   def compile_key_pattern(key_pattern)
     return key_pattern if key_pattern.is_a?(Regexp)
+
     /\A#{key_pattern_re_body(key_pattern)}\z/
   end
 
   def key_pattern_re_body(key_pattern)
-    key_pattern.
-        gsub(/\./, '\.'.freeze).
-        gsub(/\*/, '.*'.freeze).
-        gsub(/:/, '(?<=^|\.)[^.]+?(?=\.|$)'.freeze).
-        gsub(/\{(.*?)}/) { "(#{$1.strip.gsub /\s*,\s*/, '|'.freeze})" }
+    key_pattern
+      .gsub(/\./, '\.')
+      .gsub(/\*/, '.*')
+      .gsub(/:/, '(?<=^|\.)[^.]+?(?=\.|$)')
+      .gsub(/\{(.*?)}/) { "(#{Regexp.last_match(1).strip.gsub(/\s*,\s*/, '|')})" }
   end
 end

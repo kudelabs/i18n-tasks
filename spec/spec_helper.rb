@@ -1,17 +1,17 @@
 # frozen_string_literal: true
-ENV['RAILS_ENV'] = ENV['RAKE_ENV'] = 'test'
 
-unless defined?(RUBY_ENGINE) && %w(rbx jruby).include?(RUBY_ENGINE)
+if ENV['COVERAGE'] && !%w[rbx jruby].include?(RUBY_ENGINE)
   require 'simplecov'
+  SimpleCov.command_name 'RSpec'
 end
 
-$: << File.expand_path('../lib', __FILE__)
+$LOAD_PATH << File.expand_path('lib', __dir__)
 
 require 'i18n/tasks'
 require 'rake'
 
-require 'term/ansicolor'
-Term::ANSIColor::coloring = false
+require 'rainbow'
+Rainbow.enabled = false
 
 Dir['spec/support/**/*.rb'].each { |f| require "./#{f}" }
 

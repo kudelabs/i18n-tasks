@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'i18n/tasks/scanners/scanner'
 
 module I18n::Tasks::Scanners
@@ -8,6 +9,7 @@ module I18n::Tasks::Scanners
   class ScannerMultiplexer < Scanner
     # @param scanners [Array<Scanner>]
     def initialize(scanners:)
+      super()
       @scanners = scanners
     end
 
@@ -24,10 +26,17 @@ module I18n::Tasks::Scanners
     # @return [Array<Array<Results::KeyOccurrences>>]
     def collect_results
       return [@scanners[0].keys] if @scanners.length == 1
+
       Array.new(@scanners.length).tap do |results|
-        @scanners.map.with_index { |scanner, i|
-          Thread.start { results[i] = scanner.keys }
-        }.each(&:join)
+        results_mutex = Mutex.new
+        @scanners.map.with_index do |scanner, i|
+          Thread.start do
+            scanner_results = scanner.keys
+            results_mutex.synchronize do
+              results[i] = scanner_results
+            end
+          end
+        end.each(&:join)
       end
     end
   end

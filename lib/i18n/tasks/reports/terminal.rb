@@ -1,21 +1,20 @@
 # frozen_string_literal: true
+
 require 'i18n/tasks/reports/base'
 require 'terminal-table'
 module I18n
   module Tasks
     module Reports
-      class Terminal < Base
-        include Term::ANSIColor
-
+      class Terminal < Base # rubocop:disable Metrics/ClassLength
         def missing_keys(forest = task.missing_keys)
           forest = collapse_missing_tree! forest
           if forest.present?
             print_title missing_title(forest)
-            print_table headings: [cyan(bold(I18n.t('i18n_tasks.common.locale'))),
-                                   cyan(bold I18n.t('i18n_tasks.common.key')),
+            print_table headings: [Rainbow(I18n.t('i18n_tasks.common.locale')).cyan.bright,
+                                   Rainbow(I18n.t('i18n_tasks.common.key')).cyan.bright,
                                    I18n.t('i18n_tasks.missing.details_title')] do |t|
               t.rows = sort_by_attr!(forest_to_attr(forest)).map do |a|
-                [{value: cyan(format_locale(a[:locale])), alignment: :center},
+                [{ value: Rainbow(format_locale(a[:locale])).cyan, alignment: :center },
                  format_key(a[:key], a[:data]),
                  missing_key_info(a)]
               end
@@ -25,16 +24,20 @@ module I18n
           end
         end
 
-        def icon(type)
-          glyph = missing_type_info(type)[:glyph]
-          {missing_used: red(glyph), missing_diff: yellow(glyph)}[type]
+        def inconsistent_interpolations(forest = task.inconsistent_interpolations)
+          if forest.present?
+            print_title inconsistent_interpolations_title(forest)
+            show_tree(forest)
+          else
+            print_success I18n.t('i18n_tasks.inconsistent_interpolations.none')
+          end
         end
 
         def used_keys(used_tree = task.used_tree)
           # For the used tree we may have usage nodes that are not leaves as references.
-          keys_nodes = used_tree.nodes.select { |node| !!node.data[:occurrences] }.map { |node|
+          keys_nodes = used_tree.nodes.select { |node| node.data[:occurrences].present? }.map do |node|
             [node.full_key(root: false), node]
-          }
+          end
           print_title used_title(keys_nodes, used_tree.first.root.data[:key_filter])
           # Group multiple nodes
           if keys_nodes.present?
@@ -62,7 +65,7 @@ module I18n
             print_title eq_base_title(keys)
             print_locale_key_value_data_table keys
           else
-            print_info cyan('No translations are the same as base value')
+            print_info Rainbow('No translations are the same as base value').cyan
           end
         end
 
@@ -72,21 +75,45 @@ module I18n
 
         def forest_stats(forest, stats = task.forest_stats(forest))
           text  = if stats[:locale_count] == 1
-                    I18n.t('i18n_tasks.data_stats.text_single_locale', stats)
+                    I18n.t('i18n_tasks.data_stats.text_single_locale', **stats)
                   else
-                    I18n.t('i18n_tasks.data_stats.text', stats)
+                    I18n.t('i18n_tasks.data_stats.text', **stats)
                   end
-          title = bold(I18n.t('i18n_tasks.data_stats.title', stats.slice(:locales)))
-          print_info "#{cyan title} #{cyan text}"
+          title = Rainbow(I18n.t('i18n_tasks.data_stats.title', **stats.slice(:locales))).bright
+          print_info "#{Rainbow(title).cyan} #{Rainbow(text).cyan}"
+        end
+
+        def mv_results(results)
+          results.each do |(from, to)|
+            if to
+              print_info "#{Rainbow(from).cyan} #{Rainbow('⮕').yellow.bright} #{Rainbow(to).cyan}"
+            else
+              print_info "#{Rainbow(from).red}#{Rainbow(' 🗑').red.bright}"
+            end
+          end
+        end
+
+        def check_normalized_results(non_normalized)
+          if non_normalized.empty?
+            print_success 'All data is normalized'
+            return
+          end
+          log_stderr Rainbow('The following data requires normalization:').yellow
+          puts non_normalized
+          log_stderr Rainbow('Run `i18n-tasks normalize` to fix').yellow
         end
 
         private
 
         def missing_key_info(leaf)
-          if leaf[:type] == :missing_used
+          case leaf[:type]
+          when :missing_used
             first_occurrence leaf
+          when :missing_plural
+            leaf[:data][:missing_keys].join(', ')
           else
-            "#{cyan leaf[:data][:missing_diff_locale]} #{format_value(leaf[:value].is_a?(String) ? leaf[:value].strip : leaf[:value])}"
+            "#{Rainbow(leaf[:data][:missing_diff_locale]).cyan} "\
+            "#{format_value(leaf[:value].is_a?(String) ? leaf[:value].strip : leaf[:value])}"
           end
         end
 
@@ -95,34 +122,35 @@ module I18n
             from, to = data[:ref_info]
             resolved = key[0...to.length]
             after    = key[to.length..-1]
-            "  #{yellow from}#{cyan after}\n#{bold(yellow('⮕'))} #{bold yellow resolved}"
+            "  #{Rainbow(from).yellow}#{Rainbow(after).cyan}\n" \
+            "#{Rainbow('⮕').yellow.bright} #{Rainbow(resolved).yellow.bright}"
           else
-            cyan(key)
+            Rainbow(key).cyan
           end
         end
 
         def format_value(val)
-          val.is_a?(Symbol) ? "#{bold(yellow('⮕ '))}#{yellow(val.to_s)}" : val.to_s.strip
+          val.is_a?(Symbol) ? "#{Rainbow('⮕ ').yellow.bright}#{Rainbow(val).yellow}" : val.to_s.strip
         end
 
         def format_reference_desc(node_data)
-            return nil unless node_data
-            case node_data[:ref_type]
-              when :reference_usage
-                bold(yellow('(ref)'))
-              when :reference_usage_resolved
-                bold(yellow('(resolved ref)'))
-              when :reference_usage_key
-                bold(yellow('(ref key)'))
-            end
+          return nil unless node_data
+
+          case node_data[:ref_type]
+          when :reference_usage
+            Rainbow('(ref)').yellow.bright
+          when :reference_usage_resolved
+            Rainbow('(resolved ref)').yellow.bright
+          when :reference_usage_key
+            Rainbow('(ref key)').yellow.bright
+          end
         end
 
         def print_occurrences(node, full_key = node.full_key)
           occurrences = node.data[:occurrences]
-          puts [bold("#{full_key}"),
+          puts [Rainbow(full_key).bright,
                 format_reference_desc(node.data),
-                (green(occurrences.size.to_s) if occurrences.size > 1)
-               ].compact.join ' '
+                (Rainbow(occurrences.size).green if occurrences.size > 1)].compact.join ' '
           occurrences.each do |occurrence|
             puts "  #{key_occurrence full_key, occurrence}"
           end
@@ -130,12 +158,12 @@ module I18n
 
         def print_locale_key_value_data_table(locale_key_value_datas)
           if locale_key_value_datas.present?
-            print_table headings: [bold(cyan(I18n.t('i18n_tasks.common.locale'))),
-                                   bold(cyan(I18n.t('i18n_tasks.common.key'))),
+            print_table headings: [Rainbow(I18n.t('i18n_tasks.common.locale')).cyan.bright,
+                                   Rainbow(I18n.t('i18n_tasks.common.key')).cyan.bright,
                                    I18n.t('i18n_tasks.common.value')] do |t|
-              t.rows = locale_key_value_datas.map { |(locale, k, v, data)|
-                [{value: cyan(locale), alignment: :center}, format_key(k, data), format_value(v)]
-              }
+              t.rows = locale_key_value_datas.map do |(locale, k, v, data)|
+                [{ value: Rainbow(locale).cyan, alignment: :center }, format_key(k, data), format_value(v)]
+              end
             end
           else
             puts 'ø'
@@ -143,15 +171,16 @@ module I18n
         end
 
         def print_title(title)
-          log_stderr "#{bold title.strip} #{dark "|"} #{"i18n-tasks v#{I18n::Tasks::VERSION}"}"
+          log_stderr "#{Rainbow(title.strip).bright} #{Rainbow('|').faint} " \
+                     "#{"i18n-tasks v#{I18n::Tasks::VERSION}"}"
         end
 
         def print_success(message)
-          log_stderr bold(green "✓ #{I18n.t('i18n_tasks.cmd.encourage').sample} #{message}")
+          log_stderr Rainbow("✓ #{I18n.t('i18n_tasks.cmd.encourage').sample} #{message}").green.bright
         end
 
         def print_error(message)
-          log_stderr(bold red message)
+          log_stderr(Rainbow(message).red.bright)
         end
 
         def print_info(message)
@@ -159,8 +188,7 @@ module I18n
         end
 
         def indent(txt, n = 2)
-          spaces = ' ' * n
-          txt.gsub /^/, spaces
+          txt.gsub(/^/, ' ' * n)
         end
 
         def print_table(opts, &block)
@@ -168,7 +196,7 @@ module I18n
         end
 
         def key_occurrence(full_key, occurrence)
-          location = green "#{occurrence.path}:#{occurrence.line_num}"
+          location = Rainbow("#{occurrence.path}:#{occurrence.line_num}").green
           source   = highlight_key(occurrence.raw_key || full_key, occurrence.line, occurrence.line_pos..-1).strip
           "#{location} #{source}"
         end
@@ -177,29 +205,30 @@ module I18n
           # @type [I18n::Tasks::Scanners::KeyOccurrences]
           occurrences = leaf[:data][:occurrences]
           # @type [I18n::Tasks::Scanners::Occurrence]
-          first       = occurrences.first
-          [green("#{first.path}:#{first.line_num}"),
-           ("(#{I18n.t 'i18n_tasks.common.n_more', count: occurrences.length - 1})" if occurrences.length > 1)
+          first = occurrences.first
+          [
+            Rainbow("#{first.path}:#{first.line_num}").green,
+            ("(#{I18n.t 'i18n_tasks.common.n_more', count: occurrences.length - 1})" if occurrences.length > 1)
           ].compact.join(' ')
         end
 
         def highlight_key(full_key, line, range = (0..-1))
-          line.dup.tap { |s|
-            s[range] = s[range].sub(full_key) { |m|
+          line.dup.tap do |s|
+            s[range] = s[range].sub(full_key) do |m|
               highlight_string m
-            }
-          }
+            end
+          end
         end
 
         module HighlightUnderline
           def highlight_string(s)
-            underline s
+            Rainbow(s).underline
           end
         end
 
         module HighlightOther
           def highlight_string(s)
-            yellow s
+            Rainbow(s).yellow
           end
         end
 

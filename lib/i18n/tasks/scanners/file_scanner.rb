@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'i18n/tasks/scanners/scanner'
 
 module I18n::Tasks::Scanners
@@ -10,9 +11,11 @@ module I18n::Tasks::Scanners
     attr_reader :config
 
     def initialize(
-        config: {},
-        file_finder_provider: Files::CachingFileFinderProvider.new,
-        file_reader: Files::CachingFileReader.new)
+      config: {},
+      file_finder_provider: Files::CachingFileFinderProvider.new,
+      file_reader: Files::CachingFileReader.new
+    )
+      super()
       @config      = config
       @file_reader = file_reader
       @file_finder = file_finder_provider.get(**config.slice(:paths, :only, :exclude))
@@ -20,11 +23,11 @@ module I18n::Tasks::Scanners
 
     # @return (see Scanner#keys)
     def keys
-      (traverse_files { |path|
+      (traverse_files do |path|
         scan_file(path)
-      }.reduce(:+) || []).group_by(&:first).map { |key, keys_occurrences|
+      end.reduce(:+) || []).group_by(&:first).map do |key, keys_occurrences|
         Results::KeyOccurrences.new(key: key, occurrences: keys_occurrences.map(&:second))
-      }
+      end
     end
 
     protected
@@ -32,7 +35,7 @@ module I18n::Tasks::Scanners
     # Extract all occurrences of translate calls from the file at the given path.
     #
     # @return [Array<[key, Results::KeyOccurrence]>] each occurrence found in the file
-    def scan_file(path)
+    def scan_file(_path)
       fail 'Unimplemented'
     end
 
