@@ -5,6 +5,8 @@ source 'https://rubygems.org'
 # Specify your gem's dependencies in i18n-tasks.gemspec
 gemspec
 
+gem 'haml'
+
 platform :rbx do
   # https://github.com/rubinius/rubinius/issues/2632
   gem 'racc'
